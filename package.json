@@ -1,0 +1,28 @@
+{
+  "name": "@nexxupp/mcp",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Nexxupp MCP server — Cortex memory, NWS workspace, and Calendar tools over stdio.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "nexxupp-mcp": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "node --experimental-strip-types src/index.ts",
+    "test": "npm run build && MCP_MODE=hosted node --test --test-force-exit dist/unit.test.js dist/http.test.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
