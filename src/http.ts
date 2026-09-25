@@ -24,6 +24,25 @@ export class ApiError extends Error {
 
 type HeaderMap = Record<string, string>;
 
+// One place for the request envelope: JSON content type, then auth, then
+// per-call overrides. Field order is the contract (was copy-pasted ×3).
+function mergeHeaders(auth: HeaderMap, init?: RequestInit): HeaderMap {
+  return {
+    "Content-Type": "application/json",
+    ...auth,
+    ...((init?.headers as HeaderMap | undefined) ?? {}),
+  };
+}
+
+// One place for the response tail: throw parsed errors, pass through 204
+// and empty bodies, parse the rest. (Was copy-pasted ×2.)
+async function parseBody<T>(res: Response, path: string): Promise<T> {
+  if (!res.ok) throw new ApiError(res.status, await readError(res), path);
+  if (res.status === 204) return undefined as T;
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
+}
+
 function storeCookies(
   jar: Map<string, string>,
   res: Response
@@ -146,23 +165,12 @@ export async function nexxupp<T>(
     const res = await fetch(`${NEXXUPP_API_URL}${path}`, {
       ...init,
       signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${caller.token}`,
-        ...((init.headers as HeaderMap | undefined) ?? {}),
-      },
+      headers: mergeHeaders({ Authorization: `Bearer ${caller.token}` }, init),
     });
-    if (!res.ok) throw new ApiError(res.status, await readError(res), path);
-    if (res.status === 204) return undefined as T;
-    const text = await res.text();
-    return (text ? JSON.parse(text) : undefined) as T;
+    return parseBody<T>(res, path);
   }
 
-  const headers: HeaderMap = {
-    "Content-Type": "application/json",
-    ...(await session.headers()),
-    ...((init.headers as HeaderMap | undefined) ?? {}),
-  };
+  const headers: HeaderMap = mergeHeaders(await session.headers(), init);
   let res = await fetch(`${NEXXUPP_API_URL}${path}`, {
     ...init,
     signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
@@ -170,21 +178,14 @@ export async function nexxupp<T>(
   });
   if (res.status === 401 && !NEXXUPP_ACCESS_TOKEN) {
     await session.onUnauthorized();
-    const retryHeaders: HeaderMap = {
-      "Content-Type": "application/json",
-      ...(await session.headers()),
-      ...((init.headers as HeaderMap | undefined) ?? {}),
-    };
+    const retryHeaders: HeaderMap = mergeHeaders(await session.headers(), init);
     res = await fetch(`${NEXXUPP_API_URL}${path}`, {
       ...init,
       signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
       headers: retryHeaders,
     });
   }
-  if (!res.ok) throw new ApiError(res.status, await readError(res), path);
-  if (res.status === 204) return undefined as T;
-  const text = await res.text();
-  return (text ? JSON.parse(text) : undefined) as T;
+  return parseBody<T>(res, path);
 }
 
 export function get<T>(path: string): Promise<T> {

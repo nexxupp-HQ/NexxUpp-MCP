@@ -1,14 +1,8 @@
 import { z } from "zod";
 import { CORTEX_API_KEY, CORTEX_API_URL, UPSTREAM_TIMEOUT_MS } from "../config.js";
 import { ApiError } from "../http.js";
-import { defineTool } from "../tooling.js";
+import { defineTool, ok, type Agendum } from "../tooling.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-
-type Agendum = { content: { type: "text"; text: string }[] };
-
-function ok(value: unknown): Agendum {
-  return { content: [{ type: "text", text: JSON.stringify(value, null, 2) }] };
-}
 
 function fail(err: unknown): Agendum {
   const text =

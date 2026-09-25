@@ -1,13 +1,7 @@
 import { z } from "zod";
 import { get, post } from "../http.js";
-import { defineTool } from "../tooling.js";
+import { defineTool, ok, type Agendum } from "../tooling.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-
-type Agendum = { content: { type: "text"; text: string }[] };
-
-function ok(value: unknown): Agendum {
-  return { content: [{ type: "text", text: JSON.stringify(value, null, 2) }] };
-}
 
 function fail(err: unknown): Agendum {
   const text =
