@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { registerBillingTools } from "./tools/billing.js";
 import { registerCortexTools } from "./tools/cortex.js";
 import { registerNwsTools } from "./tools/nws.js";
 import { registerCalendarTools } from "./tools/calendar.js";
@@ -10,5 +11,6 @@ export function createNexxuppServer(): McpServer {
   registerCortexTools(server);
   registerNwsTools(server);
   registerCalendarTools(server);
+  registerBillingTools(server);
   return server;
 }

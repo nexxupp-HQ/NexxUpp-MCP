@@ -7,6 +7,7 @@ export const metrics = {
   mcpCalls: 0,
   mcpCallErrors: 0,
   authRejections: 0,
+  rateLimited: 0,
   perTool: new Map<string, number>(),
 };
 
@@ -24,6 +25,7 @@ export function snapshot(): Record<string, unknown> {
     mcp_calls: metrics.mcpCalls,
     mcp_call_errors: metrics.mcpCallErrors,
     auth_rejections: metrics.authRejections,
+    rate_limited: metrics.rateLimited,
     per_tool: Object.fromEntries(metrics.perTool),
   };
 }

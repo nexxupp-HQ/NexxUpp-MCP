@@ -20,13 +20,14 @@ scheduling (Calendar).
 
 ---
 
-## Tools (21)
+## Tools (22)
 
 | Prefix | Tools |
 |---|---|
 | `cortex_*` | `memory_store`, `memory_search`, `turn` |
 | `nws_*` | `search`, `summarize_station`, `create_task`, `open_page_for_event`, `search_blocks`, `read_database`, `upsert_rows`, `create_chart`, `apply_template_blocks`, `summarize_database`, `station_assist`, `list_stations` |
 | `calendar_*` | `list_calendars`, `list_events`, `create_event`, `update_event`, `delete_event`, `ai_assist` |
+| `billing_*` | `usage` (read-only wallet: balance, tier, storage vs quota, turns — check before expensive runs; no purchase tool on purpose) |
 
 Conventions the models must follow are in each tool description: datetimes are
 `YYYY-MM-DD HH:MM:SS`, memory calls are scoped per end-user id.
@@ -255,6 +256,9 @@ curl -H "Authorization: Bearer <user-access-token>" \
    and manage grants at `GET /oauth/consents` / `DELETE /oauth/consents/{client_id}`
    (revoking kills the bot's refresh tokens immediately; access tokens expire
    within ~15 minutes).
+5. Point `NEXXUPP_API_URL` at production, keep the default 120/min caller
+   quota (or lower it), and alert on `/metrics` `rate_limited` spikes —
+   they mean an agent loop is burning someone's wallet.
 
 ### Examples
 
@@ -295,8 +299,8 @@ npm run build
 npm test
 ```
 
-`npm test` runs 11 tests (unit + live transport/auth-matrix tests, no external
-services required).
+`npm test` runs 14 tests (unit + live transport/auth-matrix tests, tool-surface
+snapshot, rate-limit checks; no external services required).
 
 #### Execute
 
@@ -340,7 +344,10 @@ npm publish --access public
 - `GET /ready` returns 503 while the backend is unreachable — wire alerts
   there, not to the container healthcheck (`GET /health`).
 - Tune with `MCP_REQUEST_TIMEOUT_MS` (default 60000), `MCP_MAX_BODY_BYTES`
-  (default 1048576), `MCP_UPSTREAM_TIMEOUT_MS` (default 20000).
+  (default 1048576), `MCP_UPSTREAM_TIMEOUT_MS` (default 20000),
+  `MCP_RATE_LIMIT_MAX` (default 120) and `MCP_RATE_LIMIT_WINDOW_MS`
+  (default 60000) — the per-caller tool-call quota (429 + `Retry-After`
+  when hit, counted as `rate_limited` in `/metrics`).
 
 ## License
 

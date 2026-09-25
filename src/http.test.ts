@@ -59,7 +59,7 @@ describe("stdio transport", () => {
     child.kill("SIGKILL");
   });
 
-  it("lists all 21 tools", async () => {
+  it("lists all 22 tools", async () => {
     child.stdin!.write(
       rpcFrame(1, "initialize", {
         protocolVersion: "2024-11-05",
@@ -71,9 +71,10 @@ describe("stdio transport", () => {
     child.stdin!.write(rpcFrame(2, "tools/list", {}));
     const list = await readFrame(child.stdout!, 2);
     const tools = (list.result as { tools: { name: string }[] }).tools;
-    assert.equal(tools.length, 21);
+    assert.equal(tools.length, 22);
     const names = new Set(tools.map((t) => t.name));
     for (const expected of [
+      "billing_usage",
       "cortex_memory_store",
       "cortex_memory_search",
       "cortex_turn",

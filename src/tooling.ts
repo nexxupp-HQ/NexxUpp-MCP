@@ -20,7 +20,7 @@ export function ok(value: unknown): Agendum {
 }
 
 // Matches the fail() text convention in tools/*.ts.
-const FAIL_RE = /^(cortex|nws|calendar) request failed/;
+const FAIL_RE = /^(cortex|nws|calendar|billing) request failed/;
 
 // Registers a tool and counts calls + upstream failures for /metrics.
 // Args are inferred from the zod shape, so handlers stay fully typed.

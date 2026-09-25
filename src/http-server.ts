@@ -16,6 +16,46 @@ const MCP_PATH = "/mcp";
 const HOSTED = MCP_MODE === "hosted";
 const MAX_BODY_BYTES = Number(process.env.MCP_MAX_BODY_BYTES ?? "1048576");
 const REQUEST_TIMEOUT_MS = Number(process.env.MCP_REQUEST_TIMEOUT_MS ?? "60000");
+// Per-caller tool-call quota: MCP_RATE_LIMIT_MAX requests per
+// MCP_RATE_LIMIT_WINDOW_MS (defaults 120/min). Keyed by user id in hosted
+// mode, by socket IP otherwise. Tool calls spend wallet credits upstream,
+// so an agent loop without a cap can drain a wallet in minutes.
+const RATE_LIMIT_MAX = Number(process.env.MCP_RATE_LIMIT_MAX ?? "120");
+const RATE_LIMIT_WINDOW_MS = Number(
+  process.env.MCP_RATE_LIMIT_WINDOW_MS ?? "60000"
+);
+
+// Sliding-window hits per key. Bounded: idle keys are swept once the map
+// grows past the cap (single instance; a fleet would need Redis).
+const rateBuckets = new Map<string, number[]>();
+
+export function checkRateLimit(key: string): {
+  limited: boolean;
+  retryAfterMs: number;
+} {
+  const now = Date.now();
+  const hits = (rateBuckets.get(key) ?? []).filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
+  if (hits.length >= RATE_LIMIT_MAX) {
+    rateBuckets.set(key, hits);
+    return { limited: true, retryAfterMs: RATE_LIMIT_WINDOW_MS - (now - hits[0]) };
+  }
+  hits.push(now);
+  rateBuckets.set(key, hits);
+  if (rateBuckets.size > 20000) {
+    for (const [k, v] of rateBuckets) {
+      if (v.length === 0 || now - v[v.length - 1] > RATE_LIMIT_WINDOW_MS) {
+        rateBuckets.delete(k);
+      }
+      if (rateBuckets.size <= 10000) break;
+    }
+  }
+  return { limited: false, retryAfterMs: 0 };
+}
+
+// Test + ops helper (also lets a restart clear state honestly).
+export function resetRateLimits(): void {
+  rateBuckets.clear();
+}
 
 let oauthMetadata: unknown | null = null;
 
@@ -222,6 +262,30 @@ export async function serveHttp(port: number, host: string): Promise<Server> {
         }
         caller = resolved;
         log.debug("caller resolved", { id: requestId, user: caller.userId.slice(0, 8) });
+      }
+
+      // Tool calls cost wallet credits upstream — cap agent loops per
+      // caller (user id) or per socket IP. Health/metrics/discovery above
+      // stay unlimited; only POST /mcp is gated.
+      const rateKey = caller
+        ? `user:${caller.userId}`
+        : `ip:${req.socket.remoteAddress ?? "unknown"}`;
+      const rl = checkRateLimit(rateKey);
+      if (rl.limited) {
+        metrics.rateLimited += 1;
+        log.warn("rate limited", { id: requestId, key: caller ? "user" : "ip" });
+        res.writeHead(429, {
+          "Content-Type": "application/json",
+          "Retry-After": String(Math.max(1, Math.ceil(rl.retryAfterMs / 1000))),
+        });
+        res.end(
+          JSON.stringify({
+            jsonrpc: "2.0",
+            id: null,
+            error: { code: -32000, message: "rate limit exceeded, slow down" },
+          })
+        );
+        return;
       }
 
       let body: unknown;

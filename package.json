@@ -12,7 +12,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "node --experimental-strip-types src/index.ts",
-    "test": "npm run build && MCP_MODE=hosted node --test --test-force-exit dist/unit.test.js dist/http.test.js"
+    "test": "npm run build && MCP_MODE=hosted node --test --test-force-exit dist/unit.test.js dist/http.test.js dist/tools.test.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.0",
